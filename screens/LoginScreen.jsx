@@ -1,78 +1,53 @@
+import Navbar from "../components/Navbar";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
-//import { useNavigation } from "@react-navigation/native"; (const navigation)
-import { View, Text, TextInput, Pressable, Alert, StyleSheet } from "react-native";
-import Navbar from "../components/Navbar";
-
+import { useNavigation } from "@react-navigation/native";
+import { View, Text, TextInput, Pressable, Alert } from "react-native";
+import { loginStyles as styles } from "../styles/loginStyles.js";
 export default function LoginScreen() {
-  // 1. États locaux pour les champs du formulaire
-  const [login, setLogin] = useState("");
-  const [password, setPassword] = useState("");
-
-  // 2. Récupération de loginUser depuis le contexte
-  const { loginUser } = useAuth();
-
-  // 3. Hook pour la redirection après connexion(je sais pas si je supprime)
-  //const navigation = useNavigation();
-
-  // 4. Déclaration de la fonction handleSubmit
-
-  const handleSubmit = async () => {
-    try {
-      await loginUser(login, password);
-    } catch (error) {
-      Alert.alert("Erreur", "Identifiants incorrects ou serveur inaccessible.");
-    }
-  };
-
-
-  // 5. Rend le formulaire
-  return (
-    <View style={styles.screen}>
-      <Navbar />
-      <View style={styles.container}>
+    const [login, setLogin] = useState("");
+    const [password, setPassword] = useState("");
+    const [error, setError] = useState("");
+    const [submitting, setSubmitting] = useState(false);
+    const { loginUser } = useAuth();
+    const handleSubmit = async() => {
+        setSubmitting(true);
+        setError("");
+        try {
+            const data = await loginUser(login, password);
+        } catch (e) {
+            setError(e.message);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+    return (
+        <View style={{ flex: 1 }}>
+        <Navbar />
+        <View style={styles.container}>
         <Text style={styles.title}>Connexion</Text>
         <View>
-          <Text>Login :</Text>
-          <TextInput
-            style={styles.input}
-            value={login}
-            onChangeText={setLogin}
-          />
+        <Text>Login :</Text>
+        <TextInput
+                style={styles.input}
+                    value={login}
+                    autoCapitalize="non"
+                    onChangeText={setLogin}
+                /></View>
+                <View>
+                    <Text>Mot de passe :</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={password}
+                        onChangeText={setPassword}
+                        secureTextEntry
+                    />
+                </View>
+                <Pressable style={styles.button} onPress={handleSubmit}>
+                    <Text style={styles.buttonText}>Se connecter</Text>
+                </Pressable>
+                {error ? <Text style={{ "color": "red" }}>{error}</Text> : null}
+            </View>
         </View>
-        <View>
-          <Text>Password :</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-        </View>
-        <Pressable style={styles.button} onPress={handleSubmit}>
-          <Text style={styles.buttonText}>Se connecter</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
+);
 }
-const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  container: { flex: 1, justifyContent: "center", padding: 24 },
-  title: { fontSize: 24, fontWeight: "bold", marginBottom: 24, textAlign: "center" },
-  input: {
-    borderWidth: 1,
-    borderColor: "#CCCCCC",
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 4,
-    marginBottom: 16,
-  },
-  button: {
-    backgroundColor: "#333333",
-    borderRadius: 8,
-    padding: 14,
-    alignItems: "center",
-  },
-  buttonText: { color: "#FFFFFF", fontWeight: "bold" },
-});

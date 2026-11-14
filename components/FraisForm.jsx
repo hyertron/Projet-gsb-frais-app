@@ -1,146 +1,108 @@
-// components/FraisForm.jsx (partagé ajout / modification)
 import { useState, useEffect } from "react";
-import { View, Text, TextInput, Pressable, ScrollView } from "react-native";
+import { View, Text, TextInput, Pressable } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { API_URL } from "../config";
-import styles from "../styles/fraisFormStyles";
+import { fraisFormStyles as styles } from "../styles/fraisFormStyles.js";
 
-export default function FraisForm({ frais = null }) {
-  const navigation = useNavigation();
+export default function FraisForm({ frais = null, onSubmit }) {
+    // Utilisé uniquement pour les boutons frais hors forfait / au forfait (pas encore implémentés)
+    const navigation = useNavigation();
 
-  const [idFrais, setIdFrais] = useState(null);
-  const [anneeMois, setAnneeMois] = useState("");
-  const [nbJustificatifs, setNbJustificatifs] = useState("");
-  const [montant, setMontant] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+    // États locaux du formulaire
+    const [anneeMois, setAnneeMois] = useState("");
+    const [nbJustificatifs, setNbJustificatifs] = useState("");
+    const [montant, setMontant] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
 
-  // Pré-remplissage en mode modification
-  useEffect(() => {
-    if (frais) {
-      setIdFrais(frais.id_frais);
-      setMontant(frais.montantvalide ? String(frais.montantvalide) : "");
-      setAnneeMois(frais.anneemois || "");
-      setNbJustificatifs(String(frais.nbjustificatifs ?? ""));
-    }
-  }, [frais]);
+    // En mode modification, on préremplit les champs avec le frais reçu
+    useEffect(() => {
+        if (frais) {
+            setAnneeMois(frais.anneemois || "");
+            setNbJustificatifs(String(frais.nbjustificatifs || ""));
+            // Plus tard, on calculera ici le montant saisi à partir des montants des différents frais
+        }
+    }, [frais]);
 
-  const handleSubmit = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const token = await AsyncStorage.getItem("token");
-      if (!token) throw new Error("Token manquant");
-      const user = JSON.parse(await AsyncStorage.getItem("user"));
+    const handleSubmit = async () => {
+        setLoading(true);
+        setError("");
+        try {
+            await onSubmit({
+                anneemois: anneeMois,
+                nbjustificatifs: parseInt(nbJustificatifs, 10),
+            });
+        } catch (err) {
+            console.error("Erreur:", err);
+            setError(err.message || "Erreur lors de l'enregistrement");
+        } finally {
+            setLoading(false);
+        }
+    };
 
-      const fraisData = {
-        anneemois: anneeMois,
-        id_visiteur: user.id_visiteur,
-        nbjustificatifs: parseInt(nbJustificatifs, 10),
-      };
+    return ( 
+    <View style={styles.container}> 
+    <Text style={styles.formTitle}>{frais ? "Modifier la note de frais" : "Saisir une note de frais"}</Text> 
+    <View> 
+        <Text>Année-mois :</Text> 
+        <TextInput 
+        style={styles.input} 
+        placeholder="Année-mois (ex: 2023-10)" 
+        value={anneeMois} 
+        onChangeText={setAnneeMois} 
+        /> 
+    </View> 
+    
+    <View> 
+        <Text>Nombre de justificatifs :</Text> 
+        <TextInput 
+        style={styles.input} 
+        placeholder="Nombre de justificatifs" 
+        keyboardType="numeric" 
+        value={nbJustificatifs} 
+        onChangeText={setNbJustificatifs} 
+        /> 
+    </View> 
+    
+    <View> 
+        <Text>Montant saisi :</Text> 
+        <TextInput editable={false}
+        selectOnFocus={false} 
+        style={[styles.input, { backgroundColor: "#f0f0f0" }]} 
+        keyboardType="numeric" 
+        value={montant} 
+        onChangeText={setMontant} 
+        /> 
+    </View> 
+    
+    <View style={styles.smallButtonRow}> 
+        <Pressable 
+        style={[styles.smallbutton, styles.buttonDisabled]} 
+        //onPress={handleSubmit} 
+        disabled={loading} 
+        ><Text style={styles.buttonText}> 
+            Frais hors forfait 
+            </Text></Pressable> 
+        <Pressable 
+        style={[styles.smallbutton, styles.buttonDisabled]} 
+        //onPress={handleSubmit} 
+        disabled={loading} 
+        ><Text style={styles.buttonText}> 
+        Frais au forfait 
+        </Text></Pressable> 
+        
+    </View> 
+    {error ? <Text style={{ color: "red" }}>{error}</Text> : null} 
 
-      let url;
-      if (frais) {
-        // Modification (UPDATE)
-        fraisData.id_frais = idFrais;
-        fraisData.montantvalide = parseFloat(montant) || 0;
-        fraisData.id_etat = frais.id_etat; // on conserve l'état enregistré
-        url = `${API_URL}frais/modif`;
-      } else {
-        // Ajout (CREATE)
-        url = `${API_URL}frais/ajout`;
-      }
-
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(fraisData),
-      });
-
-      // response.ok vaut true si le code http est entre 200 et 299
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || `Erreur HTTP ${response.status}`);
-      }
-
-      navigation.navigate("Dashboard");
-    } catch (err) {
-      console.error("Erreur:", err);
-      setError(err.message || "Erreur lors de l'enregistrement");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.formTitle}>
-        {frais ? "Modifier la note de frais" : "Saisir une note de frais"}
-      </Text>
-
-      <View>
-        <Text>Année-mois :</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Année-mois (ex: 2023-10)"
-          value={anneeMois}
-          onChangeText={setAnneeMois}
-        />
-      </View>
-
-      <View>
-        <Text>Nombre de justificatifs :</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Nombre de justificatifs"
-          keyboardType="numeric"
-          value={nbJustificatifs}
-          onChangeText={setNbJustificatifs}
-        />
-      </View>
-
-      <View>
-        <Text>Montant saisi :</Text>
-        <TextInput
-          editable={false}
-          selectOnFocus={false}
-          style={[styles.input, { backgroundColor: "#f0f0f0" }]}
-          keyboardType="numeric"
-          value={montant}
-          onChangeText={setMontant}
-        />
-      </View>
-
-      <View style={styles.smallButtonRow}>
-        <Pressable
-          style={[styles.smallbutton, styles.buttonDisabled]}
-          disabled={true}
-        >
-          <Text style={styles.buttonText}>Frais hors forfait</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.smallbutton, styles.buttonDisabled]}
-          disabled={true}
-        >
-          <Text style={styles.buttonText}>Frais au forfait</Text>
-        </Pressable>
-      </View>
-
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-
-      <Pressable
-        style={[styles.button, loading && styles.buttonDisabled]}
-        onPress={handleSubmit}
-        disabled={loading}
-      >
-        <Text style={styles.buttonText}>
-          {loading ? "Enregistrement..." : frais ? "Mettre à jour" : "Ajouter"}
-        </Text>
-      </Pressable>
-    </ScrollView>
-  );
+    <Pressable 
+        style={[styles.button, loading && styles.buttonDisabled]} 
+        onPress={handleSubmit} 
+        disabled={loading} 
+    > 
+        <Text style={styles.buttonText}> 
+            {loading ? "Enregistrement.." : frais ? "Mettre à jour" : "Ajouter"} 
+        </Text> 
+        </Pressable> 
+        {error ? <Text style={styles.error}>{error}</Text> : null} 
+        </View> 
+    ); 
 }
