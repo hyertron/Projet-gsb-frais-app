@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useNavigation } from "@react-navigation/native";
+//import { useNavigation } from "@react-navigation/native"; (const navigation)
 import { View, Text, TextInput, Pressable, Alert, StyleSheet } from "react-native";
 import Navbar from "../components/Navbar";
 
@@ -12,17 +12,19 @@ export default function LoginScreen() {
   // 2. Récupération de loginUser depuis le contexte
   const { loginUser } = useAuth();
 
-  // 3. Hook pour la redirection après connexion
-  const navigation = useNavigation();
+  // 3. Hook pour la redirection après connexion(je sais pas si je supprime)
+  //const navigation = useNavigation();
 
   // 4. Déclaration de la fonction handleSubmit
-  const handleSubmit = () => {
-    if (loginUser(login, password)) {
-      navigation.navigate("Dashboard");
-    } else {
-      Alert.alert("Identifiants incorrects");
+
+  const handleSubmit = async () => {
+    try {
+      await loginUser(login, password);
+    } catch (error) {
+      Alert.alert("Erreur", "Identifiants incorrects ou serveur inaccessible.");
     }
   };
+
 
   // 5. Rend le formulaire
   return (

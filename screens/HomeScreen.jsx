@@ -1,14 +1,15 @@
-import { View, Text, Pressable } from "react-native";
+
+import { View, Text } from "react-native";
 import Navbar from "../components/Navbar";
+import { useAuth } from "../context/AuthContext";
 
+export default function HomeScreen() {
+  const { user } = useAuth();
 
-
-export default function HomeScreen({ navigation }) {
-return (
-<View>
-    <Navbar />
-<Text>Bienvenue</Text>
-
-</View>
-);
+  return (
+    <View>
+      <Navbar />
+      <Text>Bonjour {user?.prenom_visiteur} !</Text>
+    </View>
+  );
 }

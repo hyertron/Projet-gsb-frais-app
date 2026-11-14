@@ -1,115 +1,146 @@
-import fraisFormStyles from "../styles/fraisFormStyles";
-import { useState } from "react";
-import { View, Text, TextInput, Pressable } from "react-native";
+// components/FraisForm.jsx (partagé ajout / modification)
+import { useState, useEffect } from "react";
+import { View, Text, TextInput, Pressable, ScrollView } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_URL } from "../config";
+import styles from "../styles/fraisFormStyles";
 
-export default function FraisForm() {
-    const [idFrais, setIdFrais] = useState(null);
-    const [anneeMois, setAnneeMois] = useState("");
-    const [nbJustificatifs, setNbJustificatifs] = useState("");
-    const [montant, setMontant] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
+export default function FraisForm({ frais = null }) {
+  const navigation = useNavigation();
 
-    const navigation = useNavigation();
+  const [idFrais, setIdFrais] = useState(null);
+  const [anneeMois, setAnneeMois] = useState("");
+  const [nbJustificatifs, setNbJustificatifs] = useState("");
+  const [montant, setMontant] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-    const handleSubmit = async () => {
-        setLoading(true);
-        setError("");
+  // Pré-remplissage en mode modification
+  useEffect(() => {
+    if (frais) {
+      setIdFrais(frais.id_frais);
+      setMontant(frais.montantvalide ? String(frais.montantvalide) : "");
+      setAnneeMois(frais.anneemois || "");
+      setNbJustificatifs(String(frais.nbjustificatifs ?? ""));
+    }
+  }, [frais]);
 
-        try {
-            const token = await AsyncStorage.getItem("token");
-            if (!token) throw new Error("Token manquant");
+  const handleSubmit = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token) throw new Error("Token manquant");
+      const user = JSON.parse(await AsyncStorage.getItem("user"));
 
-            const user = JSON.parse(await AsyncStorage.getItem("user"));
+      const fraisData = {
+        anneemois: anneeMois,
+        id_visiteur: user.id_visiteur,
+        nbjustificatifs: parseInt(nbJustificatifs, 10),
+      };
 
-            const fraisData = {
-                anneemois: anneeMois,
-                nbjustificatifs: parseInt(nbJustificatifs, 10),
-                id_visiteur: user.id_visiteur,
-            };
+      let url;
+      if (frais) {
+        // Modification (UPDATE)
+        fraisData.id_frais = idFrais;
+        fraisData.montantvalide = parseFloat(montant) || 0;
+        fraisData.id_etat = frais.id_etat; // on conserve l'état enregistré
+        url = `${API_URL}frais/modif`;
+      } else {
+        // Ajout (CREATE)
+        url = `${API_URL}frais/ajout`;
+      }
 
-            const response = await fetch(`${API_URL}frais/ajout`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify(fraisData),
-            });
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(fraisData),
+      });
 
-            const data = await response.json().catch(() => ({}));
+      // response.ok vaut true si le code http est entre 200 et 299
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || `Erreur HTTP ${response.status}`);
+      }
 
-            if (!response.ok) {
-                throw new Error(data.error || `Erreur HTTP ${response.status}`);
-            }
+      navigation.navigate("Dashboard");
+    } catch (err) {
+      console.error("Erreur:", err);
+      setError(err.message || "Erreur lors de l'enregistrement");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-            navigation.navigate("Dashboard");
-        } catch (err) {
-            console.error("Erreur:", err);
-            setError(err.message || "Erreur lors de l'enregistrement");
-        } finally {
-            setLoading(false);
-        }
-    };
+  return (
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.formTitle}>
+        {frais ? "Modifier la note de frais" : "Saisir une note de frais"}
+      </Text>
 
+      <View>
+        <Text>Année-mois :</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Année-mois (ex: 2023-10)"
+          value={anneeMois}
+          onChangeText={setAnneeMois}
+        />
+      </View>
 
-    return (
-        <View style={fraisFormStyles.container}>
-            <Text style={fraisFormStyles.formTitle}>
-                Saisir une note de frais
-            </Text>
+      <View>
+        <Text>Nombre de justificatifs :</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Nombre de justificatifs"
+          keyboardType="numeric"
+          value={nbJustificatifs}
+          onChangeText={setNbJustificatifs}
+        />
+      </View>
 
-            <Text>Année-mois :</Text>
-            <TextInput
-                style={fraisFormStyles.input}
-                placeholder="Année-mois (ex: 2023-10)"
-                value={anneeMois}
-                onChangeText={setAnneeMois}
-            />
+      <View>
+        <Text>Montant saisi :</Text>
+        <TextInput
+          editable={false}
+          selectOnFocus={false}
+          style={[styles.input, { backgroundColor: "#f0f0f0" }]}
+          keyboardType="numeric"
+          value={montant}
+          onChangeText={setMontant}
+        />
+      </View>
 
-            <Text>Nombre de justificatifs :</Text>
-            <TextInput
-                style={fraisFormStyles.input}
-                placeholder="Nombre de justificatifs"
-                keyboardType="numeric"
-                value={nbJustificatifs}
-                onChangeText={setNbJustificatifs}
-            />
+      <View style={styles.smallButtonRow}>
+        <Pressable
+          style={[styles.smallbutton, styles.buttonDisabled]}
+          disabled={true}
+        >
+          <Text style={styles.buttonText}>Frais hors forfait</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.smallbutton, styles.buttonDisabled]}
+          disabled={true}
+        >
+          <Text style={styles.buttonText}>Frais au forfait</Text>
+        </Pressable>
+      </View>
 
-            <Text>Montant saisi :</Text>
-            <TextInput
-                editable={false}
-                style={[fraisFormStyles.input, fraisFormStyles.inputDisabled]}
-                value={montant}
-            />
+      {error ? <Text style={styles.error}>{error}</Text> : null}
 
-            <View style={{ flexDirection: "row", gap: 10, marginBottom: 15 }}>
-                <Pressable disabled={loading}>
-                    <Text>Frais hors forfait</Text>
-                </Pressable>
-
-                <Pressable disabled={loading}>
-                    <Text>Frais au forfait</Text>
-                </Pressable>
-            </View>
-
-            {error ? (
-                <Text style={fraisFormStyles.error}>{error}</Text>
-            ) : null}
-
-            <Pressable
-                onPress={handleSubmit}
-                disabled={loading}
-                style={fraisFormStyles.button}
-            >
-                <Text style={fraisFormStyles.buttonText}>
-                    {loading ? "Enregistrement..." : "Ajouter"}
-                </Text>
-            </Pressable>
-        </View>
-    );
-
+      <Pressable
+        style={[styles.button, loading && styles.buttonDisabled]}
+        onPress={handleSubmit}
+        disabled={loading}
+      >
+        <Text style={styles.buttonText}>
+          {loading ? "Enregistrement..." : frais ? "Mettre à jour" : "Ajouter"}
+        </Text>
+      </Pressable>
+    </ScrollView>
+  );
 }
